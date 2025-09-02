@@ -1,0 +1,12 @@
+$(function() {
+$("#btn").click(function() {
+$.get("login",$("#loginForm").serialize(),function(res) {
+if(res.flag) {
+//跳转到 main.html页面
+location.href = "main.html";
+} else {
+$("#err_msg").html(res.message);
+}
+},"json");
+});
+})

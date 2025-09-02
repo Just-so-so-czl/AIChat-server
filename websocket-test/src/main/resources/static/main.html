@@ -1,0 +1,113 @@
+var toName;
+var username;
+function showChat(name) {
+toName = name;
+//清除聊天区的数据
+$("#msgs").html("");
+//现在聊天对话框
+$("#chatArea").css("display","inline");
+//显示“正在和谁聊天”
+$("#chatMes").html("正在和 <font face=\"楷体\">"+toName+"</font> 聊天");
+
+//切换用户，需要将聊天记录渲染到聊天区
+var storeData = sessionStorage.getItem(toName);
+if(storeData != null) {
+$("#msgs").html(storeData);
+}
+}
+
+$(function() {
+$.ajax({
+url:"getUsername",
+success:function(res) {
+username = res;
+//显示在线信息
+$("#userName").html(" 用户："+res+"<span style='float: right;color: green'>在线</span>");
+},
+async: false
+})
+
+//创建websocket
+var ws;
+if(window.WebSocket) {
+ws = new WebSocket("ws://localhost/chat");
+}
+
+//绑定事件
+ws.onopen = function(evt) {
+//显示在线信息
+$("#userName").html(" 用户："+username+"<span style='float: right;color: green'>在线</span>");
+}
+
+ws.onmessage = function(evt) {
+//接收服务器推送的消息
+var data = evt.data;
+//将该字符串数据转换为json
+var res = JSON.parse(data);
+//判断是系统消息还是推送给个人的消息
+if(res.isSystem) {
+//系统消息
+var names = res.message;
+var userListStr = "";
+var broadcastStr = "";
+for(var name of names) {
+if(name != username) {
+userListStr += "<li class=\"rel-item\"><a οnclick='showChat(\""+name+"\")'>"+name+"</a></li>";
+broadcastStr += "<li class=\"rel-item\" style=\"color: #9d9d9d;font-family: 宋体\">您的好友 "+name+" 已上线</li>";
+}
+}
+//将数据渲染到页面
+$("#userlist").html(userListStr);
+$("#broadcastList").html(broadcastStr);
+} else {
+//非系统消息
+var content = res.message;
+
+//拼接聊天区展示的数据
+var str = "<div class=\"msg robot\"><div class=\"msg-left\" worker=\"\"><div class=\"msg-host photo\" style=\"background-image: url(img/avatar/Member002.jpg)\"></div><div class=\"msg-ball\">"+content+"</div></div></div>";
+
+
+//有可能现在不是和指定用户的聊天框，所以需要进行判断
+var storeData = sessionStorage.getItem(res.fromName);
+if(storeData != null) {
+storeData += str;
+} else {
+storeData = str;
+}
+sessionStorage.setItem(res.fromName,storeData);
+if(toName == res.fromName) {
+//将数据追加到聊天区
+$("#msgs").append(str);
+}
+}
+}
+
+ws.onclose = function() {
+//显示在线信息
+$("#userName").html(" 用户："+username+"<span style='float: right;color: red'>离线</span>");
+}
+
+//给发送按钮绑定点击事件
+$("#submit").click(function() {
+//获取输入的内容
+var data = $("#context_text").val();
+//将该文本框清空
+$("#context_text").val("");
+//拼接消息
+var str = "<div class=\"msg guest\"><div class=\"msg-right\"><div class=\"msg-host headDefault\"></div><div class=\"msg-ball\">"+data+"</div></div></div>";
+$("#msgs").append(str);
+//将聊天记录进行存储sessionStorage
+var storeData = sessionStorage.getItem(toName);
+if(storeData != null) {
+//将此次的内容拼接到storeData中
+str = storeData + str;
+}
+//将消息存储到sessionStorage中
+sessionStorage.setItem(toName,str);
+
+//定义服务端需要的数据格式
+var message = {toName:toName,message:data};
+//将输入的数据发送给服务器
+ws.send(JSON.stringify(message));
+});
+})
